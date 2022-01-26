@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+
+<div class="container jumbotron" style="padding:5px; margin-top:5px; text-align: center; ">
+
+<div class="row" style="width: 100%; margin: auto;">
+
+	<div class="col-sm">
+
+<h1>Welcome to Mines Paris Parking  <img src="https://www.armines.net/sites/default/files/logo_mines_1000x1000.png" style="width:150px; height: 150px;" >
+</h1>
+
+<h3> The door is: <span id="door"></span> </h3>
+<button id="door_toggle" class="btn btn-primary" onclick="toggle()"> </button>
+
+<br>
+<br>
+<div  style="text-align: center;margin-top:0px; ">
+
+
+	<table style="text-align: center;border-spacing: 30px; width: 100%;">
+		<tr>
+			<td class="vacant" id="slot1">Available
+			</td>
+			<td class="vacant" id="slot2"> Available</td>
+			<td class="vacant" id="slot3">Available
+			</td>
+			<td class="vacant" id="slot4">Available
+			</td>
+			<td class="vacant" id="slot5">Available</td>
+		
+			
+		</tr>
+
+	</table>
+	<script>
+
+		var c = "#0fa";
+
+			var intervalId = setInterval(function() {
+				$(".vacant").css("background-color",c);
+
+				if (c=="#0fa") c="transparent";
+				else c = "#0fa";
+			}, 1000);
+
+	</script>
+
+</div>
+</div>
+</div>
+
+<br><br>
+<div class="row"  style="width: 100%; margin: auto;">
+	<div  style="text-align: center; width: 30%;margin-left: 16px; "> 
+		<br><br>
+		<table style="text-align: center;border-spacing: 30px; ">
+			<tr>
+				<td class="vacant" id="slot1">available
+				</td>
+				
+			
+				
+			</tr>
+	
+		</table>
+
+
+
+	</div>
+	<div  style="width: 60%;"><h3 id="state"> </h3>
+
+
+	</div>
+	
+</div>
+
+
+
+</div>
+<br><br><br><br><br>
+<style>
+th, td {
+	border: 1px solid black;
+}
+
+td {
+	height:270px;
+	width: 200px;
+	
+}
+
+table {
+	border: 0px;
+	border-spacing: 5px;
+}
+</style>
+
+
+
+
+</div>
+ <script src="https://code.jquery.com/jquery-3.1.0.min.js"></script>
+
+ <script type="text/javascript">
+ 	slots = [null , $("#slot1"), $("#slot2"), $("#slot3"), $("#slot4"), $("#slot5"), $("#slot6"), ];
+	 console.log(slots);
+    function toggle() {
+        $.ajax({
+        url: "{% url 'administration' %}",
+        type: 'POST',
+        data: {'check': true},
+        
+        });
+    }
+ 	setInterval(function () {
+ 	
+    $.ajax({
+        url: "{% url 'administration' %}",
+        type: 'GET',
+        data: {'check': true},
+ 
+        success: function (json) {
+            var p = 0;
+            if (json.result) {
+                   console.log(json.drivers);
+                    $("#door").html(json.door);
+
+                    if (json.door == "open")
+                        $("#door_toggle").html("Click to close the door");
+                    else 
+                        $("#door_toggle").html("Click to open the door");
+
+				if (json.occupations) {
+					var i = 1;
+
+					while (i<=5) 
+						{
+							/*if (json.occupations.includes(i) && slots[i].attr('class')=="full")
+							 {
+								 i++;
+								 continue;
+							 }*/
+							 
+							 if (!json.occupations.includes(i) && slots[i].attr('class')=="vacant")
+							 {
+								 i++;
+								 continue;
+							 }
+
+							slots[i].removeClass();
+							slots[i].html("")
+							slots[i].css("background","transparent");
+
+							if (json.occupations.includes(i)) 
+								{
+									slots[i].addClass("full");
+                                    var item = '<br> Car Number: '+ json.cars[p] + '<hr><img src="/static/car.png" style="width:200px; height: 278px  " >';
+                                    var driver = json.drivers[p];
+                                    item += '<hr>' + driver.name + '<br>' + driver.surname;
+                                    item += '<br>' + driver.email + '<br>' + driver.telephone;
+									slots[i].html(item);
+                                    p++;
+								}
+
+							else {
+								slots[i].addClass("vacant");
+								slots[i].html('Available');
+								slots[i].css("background","#0fa");
+							
+							}
+							
+							i++;
+						}
+				}
+                if (json.status) 
+                	console.log(json.status);
+                else console.log("empty");
+
+                if (json.result == "empty")
+                {
+                	$("#state").show();
+                	$("#state").html("The entrance is available! Please wait for the system to scan your car.");
+                	$("#sendmail").hide();
+                	$("#verification").hide();
+                	$("#verified_registry").hide();
+						$("#ouverture").hide();
+
+
+                }
+                else {
+$("#state").show();
+
+                	$("#state").html("Car with #" + json.registry + " is waiting at the door ");
+
+                	if (json.status == "pending")
+                	{
+                		$("#sendmail").show();
+                		$("#verification").hide();
+                		$("#verified_registry").hide();
+						$("#ouverture").hide();
+
+                	}
+
+                	else if (json.status == "in progress") {
+                		$("#sendmail").hide();
+                		$("#verification").show();
+                		$("#verified_registry").hide();
+						$("#ouverture").hide();
+
+                	}
+
+                	else if (json.status == "verified") {
+
+						$("#verified_registry").html("Car Registry: " + json.registry);
+						$("#verified_registry").show();
+						$("#ouverture").show();
+						$("#sendmail").hide();
+                		$("#verification").hide();
+                		$("#state").hide();
+
+                	}
+                }
+
+            }
+        }
+    });
+}, 1000);
+
+
+ </script>
+
+{% endblock %}

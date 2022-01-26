@@ -1,0 +1,28 @@
+
+body {
+position: relative;
+padding: 0;
+margin: 0;
+  background-position: fixed;
+  background-attachment: fixed;
+height: 100%;
+}
+
+
+body:after {
+  content: "";
+  background-image: url("https://www.paristech.fr/sites/default/files/styles/carrousel/public/documents/46912541864_8c5806a182_c_1.jpg");
+  opacity: 0.5;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background-repeat: no-repeat;
+  background-size: cover;
+  width:100%;
+  height:100%;
+  position: fixed;
+  background-position: fixed;
+  background-attachment: fixed;
+  z-index: -1;
+}
