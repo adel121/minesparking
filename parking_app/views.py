@@ -32,7 +32,7 @@ def getPosition(request):
 
 
 
-
+@csrf_exempt
 def addPendingRequest(request, registry):
 
 	"""
@@ -49,26 +49,47 @@ def addPendingRequest(request, registry):
 	"""
 	response = {}
 
+
+	capture = Capture.objects.all()[0]
+
+	if int((datetime.datetime.now().replace(tzinfo=None) - capture.LastAllowed.replace(tzinfo=None)).total_seconds()) > 30 and capture.State == "allowed":
+	    capture.State = "not allowed"
+	    capture.save()
+
+
+	if capture.State != "allowed":
+	    response['results'] = "permission denied, the driver must click the scan button"
+	    response["code"] = -1
+	    return HttpResponse(json.dumps(response), content_type="application/json")
+
+
+
+	if Occupies.objects.filter(Car__Registry = registry).exists():
+	    response['results'] = "permission denied, the car is already inside the parking"
+	    response["code"] = -1
+	    return HttpResponse(json.dumps(response), content_type="application/json")
+
+
 	response['result'] = 'Request Already In Queue'
 	response['code'] = 0
 
-	if Pending_Request.objects.all().count() > 1:
+	if Pending_Request.objects.all().count() >= 1:
 		response['result'] = 'Queue is currently busy, please wait until the next car has finished'
 		response['code'] = -1
 
 
+
 	elif not Pending_Request.objects.filter(Registry = registry).exists():
 		pending_request = Pending_Request(Registry = registry)
-		
 		pending_request.Last_Captured = datetime.datetime.now()
 		pending_request.save()
 		response['result'] = 'Request successfully pushed into the Queue'
 		response['code'] = 1
 
-	
+
 	else:
 		pending_request = Pending_Request.objects.get(Registry = registry)
-		
+
 		pending_request.Last_Captured = datetime.datetime.now()
 		pending_request.save()
 
@@ -109,7 +130,7 @@ def is_ajax(request):
 
 @csrf_exempt
 def match_cars(request):
-	
+
 	if request.method != "POST":
 		return HttpResponse(
                 json.dumps({
@@ -118,19 +139,19 @@ def match_cars(request):
                 }),
                 content_type="application/json"
             )
-	
+
 	'''
 	The expected format of the json object is as follows:
 	{ "positiodatan1" : car_number1, "position2" : car_number2, .... , "position5":car_number5 , "anomaly" : True/False}
 
 	Where:
-		car_numberi = "-1" if position i is empty, else = car registry 
+		car_numberi = "-1" if position i is empty, else = car registry
 
 
-	ex: 
+	ex:
 	{ "position1" : "2778154" , "position2": -1, "position3": "5544AZZ", "position4": "-1", "position5": "323DDDX", "anomaly" : False }
 	'''
-	
+
 	data  = json.loads(request.body)
 
 	position = 1
@@ -138,15 +159,24 @@ def match_cars(request):
 	Occupies.objects.all().delete()
 
 	cars = []
-
 	while position <= 5:
 		if data["position"+str(position)] == "-1":
 			cars.append(None)
 		else:
-			cars.append(Car.objects.get(Registry = data["position"+str(position)]))
+		    if not Car.objects.filter(Registry = data["position"+str(position)]).exists():
+		        c = Car()
+		        c.Registry=data["position"+str(position)]
+		        c.save()
+		        dc = Drives_Car()
+		        dr = Driver.objects.get(Name = "Unknown")
+		        dc.Car=c
+		        dc.Driver=dr
+		        dc.save()
+		    cars.append(Car.objects.get(Registry = data["position"+str(position)]))
+
 		position+=1
-	
-	
+
+
 	for position, car in zip(POSS, cars):
 		if car == None:
 			continue
@@ -154,7 +184,13 @@ def match_cars(request):
 		occupies.Car = car
 		occupies.Position = position
 		occupies.save()
-	
+
+	if data["anomaly"]:
+	    occupies = Occupies()
+	    occupies.Car = Car.objects.get(Registry = "ANOMALY")
+	    occupies.Position = POS6
+	    occupies.save()
+
 	return HttpResponse(
                 json.dumps({
                     "result": 1,
@@ -169,6 +205,13 @@ def match_cars(request):
 def processQueue(request):
 	occupations = []
 
+	capture = Capture.objects.all()[0]
+
+	if int((datetime.datetime.now().replace(tzinfo=None) - capture.LastAllowed.replace(tzinfo=None)).total_seconds()) > 10 and capture.State == "allowed":
+	    capture.State = "not allowed"
+	    capture.save()
+
+
 	for item in list(Occupies.objects.all()):
 		occupations.append(item.Position.Rank)
 
@@ -182,7 +225,7 @@ def processQueue(request):
 			pending_request.delete()
 
 
-			
+
 	if request.method == "GET":
 
 		if is_ajax(request):
@@ -191,6 +234,8 @@ def processQueue(request):
 	                json.dumps({
 	                    "result": "empty",
 						"occupations": occupations,
+						"capture_state":capture.State,
+						"capture_countdown": int((datetime.datetime.now().replace(tzinfo=None) - capture.LastAllowed.replace(tzinfo=None)).total_seconds())
 	                }),
 	                content_type="application/json"
 	            )
@@ -203,6 +248,8 @@ def processQueue(request):
 	                    "registry":registry,
 	                    "status":pending_request.Status,
 						"occupations": occupations,
+						"capture_state":capture.State,
+						"capture_countdown": int((datetime.datetime.now().replace(tzinfo=None) - capture.LastAllowed.replace(tzinfo=None)).total_seconds())
 	                }),
 	                content_type="application/json"
 	            )
@@ -215,7 +262,7 @@ def processQueue(request):
 				status = pending_request.Status
 
 			return render(request,"index.html",{'status':status})
-			
+
 	if request.method == "POST":
 
 		if Pending_Request.objects.all().count():
@@ -226,15 +273,18 @@ def processQueue(request):
 			if pending_request.Status == 'pending':
 				## email must be sent
 				gen_code = str(generateCode())
-				
+
 				is_registered = Car.objects.filter(Registry = registry).exists()
 
 				if not is_registered:
 					pending_request.Status = 'in progress'
 					pending_request.Verification_Code = gen_code
-					pending_request.save()
+
 					driver = Driver()
 					driver = register_driver(request.POST.get("name"), request.POST.get("surname"),request.POST.get("telephone"),request.POST.get("email"))
+
+					pending_request.Driver = driver
+					pending_request.save()
 					send_mail(
 				    'Verification Code - Mines Paris',
 				    'Here is your verification code: '+gen_code,
@@ -243,11 +293,10 @@ def processQueue(request):
 				    fail_silently=False,
 				)
 
-					return render(request,'index.html',{'state':'emailed','registry':registry, 'status': pending_request.Status, 'driver':driver.pk})
+					return render(request,'index.html',{'state':'emailed','registry':registry, 'status': pending_request.Status,})
 
 				else:
-					pending_request.Status = 'verified'
-					pending_request.save()
+
 					driver = Driver()
 					driver = register_driver(request.POST.get("name"), request.POST.get("surname"),request.POST.get("telephone"),request.POST.get("email"))
 					drives_car = Drives_Car()
@@ -258,6 +307,10 @@ def processQueue(request):
 					drives_car.Car = car
 
 					drives_car.save()
+					pending_request.Status = 'verified'
+
+					pending_request.Driver = driver
+					pending_request.save()
 
 					return render(request,"index.html",{'state':'success',})
 
@@ -279,7 +332,7 @@ def processQueue(request):
 
 					drives_car = Drives_Car()
 
-					driver = Driver.objects.get(pk = request.POST.get("driver"))
+					driver = pending_request.Driver
 					drives_car.Driver = driver
 
 					car = Car.objects.get(Registry = registry)
@@ -298,24 +351,81 @@ def processQueue(request):
 		pass
 
 
+
+@csrf_exempt
+def allow_capture(request):
+    response = {}
+    if not is_ajax(request):
+        response['result'] = "Permission denied, the request should be of type AJAX"
+        response['code']=-1
+        return HttpResponse(json.dumps(response),content_type="application/json")
+
+    capture = Capture.objects.all()[0]
+    capture.State = "allowed"
+    capture.LastAllowed = datetime.datetime.now()
+    capture.save()
+
+    response["result"]="Capture allowed succesfully for 10 seconds"
+    response["code"]=1
+
+    return HttpResponse(json.dumps(response),content_type="application/json")
+
+
+@csrf_exempt
+def clear_queue(request):
+    response = {}
+    if not is_ajax(request):
+        response['result'] = "Permission denied, the request should be of type AJAX"
+        response['code']=-1
+        return HttpResponse(json.dumps(response),content_type="application/json")
+
+    Pending_Request.objects.all().delete()
+
+    response["result"]="Queue Cleared Successfully"
+    response["code"]=1
+
+    return HttpResponse(json.dumps(response),content_type="application/json")
+
+
+
+
+
+
 @csrf_exempt
 def administration(request):
 
 	door = Door.objects.all()[0].State
-	
+
 	occupations = []
 
 	drivers = []
 
 	cars = []
-
+	anomalous_positions = []
+	car_to_position = {}
 	for item in list(Occupies.objects.all()):
+
 		occupations.append(item.Position.Rank)
 		car = item.Car
+		key = car.Registry
+
+		if car.Registry not in car_to_position:
+		    car_to_position[car.Registry] = []
+
+		car_to_position[car.Registry].append(item.Position.Rank)
+
+
 		cars.append(car.Registry)
-		
+
 		driver = list(Drives_Car.objects.filter(Car = car).order_by('-Pub_Time'))[0].Driver
 		drivers.append({'name':driver.Name, 'surname':driver.Surname, 'email':driver.Email, 'telephone':driver.Telephone})
+
+	for car in car_to_position:
+	    positions = car_to_position[car]
+	    if len(positions)<2:
+	        continue
+	    for p in positions:
+	        anomalous_positions.append(p)
 
 	number_of_requests = int(Pending_Request.objects.all().count())
 
@@ -329,7 +439,7 @@ def administration(request):
 				door.save()
 				return HttpResponse(
 					json.dumps({
-	                    
+
 	                }),
 	                content_type="application/json"
 	            )
@@ -340,7 +450,8 @@ def administration(request):
 						"occupations": occupations,
 						"door": door,
 						"drivers": drivers,
-						"cars":cars
+						"cars":cars,
+						"anomalous_positions":anomalous_positions
 	                }),
 	                content_type="application/json"
 	            )
@@ -355,7 +466,8 @@ def administration(request):
 						"occupations": occupations,
 						"door":door,
 						"drivers": drivers,
-						"cars":cars
+						"cars":cars,
+						"anomalous_positions":anomalous_positions
 	                }),
 	                content_type="application/json"
 	            )
@@ -368,6 +480,21 @@ def administration(request):
 			status = pending_request.Status
 
 		return render(request,"administration.html",{'status':status})
+
+
+def get_state(request,registry):
+    if Car.objects.filter(Registry = registry).exists():
+        return HttpResponse("True")
+    else:
+        return HttpResponse("False")
+
+def get_capture(request):
+    return HttpResponse(Capture.objects.all()[0].State)
+
+
+
+
+
 
 
 

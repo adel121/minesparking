@@ -8,7 +8,7 @@
 
 	<div class="col-sm">
 
-<h1>Welcome to Mines Paris Parking  <img src="https://www.armines.net/sites/default/files/logo_mines_1000x1000.png" style="width:150px; height: 150px;" >
+<h1>Welcome to Mines Paris Parking <!-- <img src="https://www.armines.net/sites/default/files/logo_mines_1000x1000.png" style="width:150px; height: 150px;" >-->
 </h1>
 
 <h3> The door is: <span id="door"></span> </h3>
@@ -29,23 +29,12 @@
 			<td class="vacant" id="slot4">Available
 			</td>
 			<td class="vacant" id="slot5">Available</td>
-		
-			
+
+
 		</tr>
 
 	</table>
-	<script>
 
-		var c = "#0fa";
-
-			var intervalId = setInterval(function() {
-				$(".vacant").css("background-color",c);
-
-				if (c=="#0fa") c="transparent";
-				else c = "#0fa";
-			}, 1000);
-
-	</script>
 
 </div>
 </div>
@@ -53,27 +42,55 @@
 
 <br><br>
 <div class="row"  style="width: 100%; margin: auto;">
-	<div  style="text-align: center; width: 30%;margin-left: 16px; "> 
+	<div  style="text-align: center; width: 30%;margin-left: 16px; ">
 		<br><br>
 		<table style="text-align: center;border-spacing: 30px; ">
 			<tr>
-				<td class="vacant" id="slot1">available
+				<td class="vacant" id="slot6">available
 				</td>
-				
-			
-				
+
+
+
 			</tr>
-	
+
 		</table>
 
 
+<script>
+	colors = [null, "rgb(0, 255, 170)", "rgb(0, 255, 170)","rgb( 0,255, 170)","rgb(0, 255, 170)","rgb(0, 255, 170)","transparent"];
+		var c = 0
+
+			var intervalId = setInterval(function() {
+
+
+			    const slots = $(".vacant")
+
+				for (var i = 0; i<slots.length; i++) {
+
+                    if($(".vacant")[i].id == 'slot6')
+                        continue;
+
+				    if (c)
+				    $("#"+$(".vacant")[i].id).css("background-color", "transparent");
+				    else
+				     $("#"+$(".vacant")[i].id).css("background-color", colors[$(".vacant")[i].id[4]]);
+
+				}
+				 c++;
+                c%=2;
+			}, 1000);
+
+	</script>
+	</div>
+	<div  style="width: 60%;">
+
+	    <h3 id="state"> </h3>
+
+	    <button class='btn btn-danger' onclick="clear_queue()">Clear Queue</button>
+
 
 	</div>
-	<div  style="width: 60%;"><h3 id="state"> </h3>
 
-
-	</div>
-	
 </div>
 
 
@@ -88,7 +105,7 @@ th, td {
 td {
 	height:270px;
 	width: 200px;
-	
+
 }
 
 table {
@@ -105,44 +122,74 @@ table {
 
  <script type="text/javascript">
  	slots = [null , $("#slot1"), $("#slot2"), $("#slot3"), $("#slot4"), $("#slot5"), $("#slot6"), ];
-	 console.log(slots);
+var anomalous_positions = [];
     function toggle() {
         $.ajax({
         url: "{% url 'administration' %}",
         type: 'POST',
         data: {'check': true},
-        
+
         });
     }
+
+    function clear_queue() {
+        $.ajax({
+        url: "{% url 'clear_queue' %}",
+        type: 'POST',
+        data: {'check': true},
+
+        });
+
+    }
  	setInterval(function () {
- 	
+
     $.ajax({
         url: "{% url 'administration' %}",
         type: 'GET',
         data: {'check': true},
- 
+
         success: function (json) {
             var p = 0;
             if (json.result) {
-                   console.log(json.drivers);
+
+                    var new_anomalous_positions = json.anomalous_positions;
+
+                    for (var i = 0; i<anomalous_positions.length; i++)
+                     {
+                         if (new_anomalous_positions.includes(anomalous_positions))
+                            continue;
+
+                        $("#slot"+anomalous_positions[i]).css('background',"transparent");
+
+                     }
+
+                     for (var i = 0; i<new_anomalous_positions.length; i++)
+                        $("#slot"+new_anomalous_positions[i]).css('background',"rgb(200,0,80");
+
+                    anomalous_positions = new_anomalous_positions;
+
                     $("#door").html(json.door);
 
                     if (json.door == "open")
                         $("#door_toggle").html("Click to close the door");
-                    else 
+                    else
                         $("#door_toggle").html("Click to open the door");
 
 				if (json.occupations) {
-					var i = 1;
 
-					while (i<=5) 
+
+					var i = 1;
+					var j = 0;
+
+					while (i<=6)
 						{
-							/*if (json.occupations.includes(i) && slots[i].attr('class')=="full")
+							if (json.occupations.includes(i) && slots[i].attr('class')=="full")
 							 {
 								 i++;
+								 j++;
 								 continue;
-							 }*/
-							 
+							 }
+
 							 if (!json.occupations.includes(i) && slots[i].attr('class')=="vacant")
 							 {
 								 i++;
@@ -153,30 +200,39 @@ table {
 							slots[i].html("")
 							slots[i].css("background","transparent");
 
-							if (json.occupations.includes(i)) 
+							if (json.occupations.includes(i))
 								{
+
+
 									slots[i].addClass("full");
-                                    var item = '<br> Car Number: '+ json.cars[p] + '<hr><img src="/static/car.png" style="width:200px; height: 278px  " >';
-                                    var driver = json.drivers[p];
-                                    item += '<hr>' + driver.name + '<br>' + driver.surname;
-                                    item += '<br>' + driver.email + '<br>' + driver.telephone;
-									slots[i].html(item);
-                                    p++;
+									var slot_data = "<br>" + json.cars[j] + "<hr><img src='/static/car.png' style='width:150px; height: 200px'><hr>";
+									var driver = json.drivers[j];
+
+									j++;
+									slot_data+="name: " + driver.name + "<br>email: "+driver.email+"<br>phone: "+driver.telephone+"<br>";
+
+									slots[i].html(slot_data);
+
 								}
 
 							else {
+
 								slots[i].addClass("vacant");
 								slots[i].html('Available');
-								slots[i].css("background","#0fa");
-							
+								slots[i].css("background",colors[i]);
+
+
 							}
-							
+
 							i++;
 						}
+
+					if(json.occupations.includes(6))
+					    $("#slot6").css("background",'rgb(200,0,86)')
+					else
+					    $("#slot6").css("background",'transparent')
 				}
-                if (json.status) 
-                	console.log(json.status);
-                else console.log("empty");
+
 
                 if (json.result == "empty")
                 {

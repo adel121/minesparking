@@ -52,7 +52,7 @@ class Drives_Car(models.Model):
 	Car = models.ForeignKey(Car,on_delete=models.CASCADE)
 	Pub_Time =  models.DateTimeField(default =django.utils.timezone.now())
 	def __str__(self):
-		return self.Driver.Name + " " + self.Driver.Surname + "-" + self.Car.Registry 
+		return self.Driver.Name + " " + self.Driver.Surname + "-" + self.Car.Registry
 
 
 class Pending_Request(models.Model):
@@ -60,8 +60,18 @@ class Pending_Request(models.Model):
 	Verification_Code = models.CharField(max_length = 100, default="unverified")
 	Last_Captured = models.DateTimeField(default =django.utils.timezone.now())
 	Status = models.CharField(max_length=100, choices = [ ('pending','pending'), ('in progress','in progress'), ('verified', 'verified')], default = 'pending')
+	Driver = models.ForeignKey(Driver,on_delete = models.CASCADE, null = True)
 	def __str__(self):
 		return self.Registry
+
+
+class Capture(models.Model):
+    State = models.CharField(max_length=100, choices=[('allowed','allowed'),('not allowed','not allowed')],default='not allowed')
+    LastAllowed = models.DateTimeField(default =django.utils.timezone.now())
+
+    def __str__(self):
+        return self.State + " - Last allowed at: " + str(self.LastAllowed)
+
 
 
 

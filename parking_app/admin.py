@@ -9,6 +9,7 @@ admin.site.register(Position)
 admin.site.register(Drives_Car)
 admin.site.register(Pending_Request)
 admin.site.register(Door)
+admin.site.register(Capture)
 
 
 

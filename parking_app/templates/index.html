@@ -11,6 +11,11 @@
 <h1>Welcome to Mines Paris Parking  <img src="https://www.armines.net/sites/default/files/logo_mines_1000x1000.png" style="width:150px; height: 150px;" >
 </h1>
 
+<h3> Detection is: <span id="detection_state"></span> </h3>
+<button id="enable_button" class="btn btn-primary" onclick="enable()"> </button>
+
+<br><br>
+
 <div  style="text-align: center;margin-top:0px; ">
 
 
@@ -24,23 +29,12 @@
 			<td class="vacant" id="slot4">Available
 			</td>
 			<td class="vacant" id="slot5">Available</td>
-		
-			
+
+
 		</tr>
 
 	</table>
-	<script>
 
-		var c = "#0fa";
-
-			var intervalId = setInterval(function() {
-				$(".vacant").css("background-color",c);
-
-				if (c=="#0fa") c="transparent";
-				else c = "#0fa";
-			}, 1000);
-
-	</script>
 
 </div>
 </div>
@@ -48,19 +42,43 @@
 
 <br><br>
 <div class="row"  style="width: 100%; margin: auto;">
-	<div  style="text-align: center; width: 30%;margin-left: 16px; "> 
+	<div  style="text-align: center; width: 30%;margin-left: 16px; ">
 		<br><br>
 		<table style="text-align: center;border-spacing: 30px; ">
 			<tr>
-				<td class="vacant" id="slot1">available
+				<td class="vacant" id="slot6">available
 				</td>
-				
-			
-				
-			</tr>
-	
-		</table>
 
+
+
+			</tr>
+
+		</table>
+	<script>
+	colors = [null, "rgb(0, 255, 170)", "rgb(0, 255, 170)","rgb( 0,255, 170)","rgb(0, 255, 170)","rgb(0, 255, 170)","transparent"];
+		var c = 0
+
+			var intervalId = setInterval(function() {
+
+
+			    const slots = $(".vacant")
+
+				for (var i = 0; i<slots.length; i++) {
+				    console.log($(".vacant")[i].id);
+                    if($(".vacant")[i].id == 'slot6')
+                        continue;
+
+				    if (c)
+				    $("#"+$(".vacant")[i].id).css("background-color", "transparent");
+				    else
+				     $("#"+$(".vacant")[i].id).css("background-color", colors[$(".vacant")[i].id[4]]);
+
+				}
+				 c++;
+                c%=2;
+			}, 1000);
+
+	</script>
 
 
 	</div>
@@ -68,48 +86,48 @@
 
 
 		<h1 id="ouverture" style="color:green; display: none;">Code Bon! Attendez l'ouverture de la porte...</h1>
-	
-	
-	<h2 id="verified_registry" style="display:none"> 
+
+
+	<h2 id="verified_registry" style="display:none">
 	</h2>
-	
+
 	<div id="sendmail" style="display: none;">
 		<form action="{% url 'process_queue' %}" method='POST'>
 			{% csrf_token %}
-	
+
 				<input class="form-control" type="email" name="email" placeholder="Please Enter Your Email">
 			<br><br>
-			 
-			 
-	
+
+
+
 		<input class="form-control" type="text" name="name" placeholder="Name"> <br> <br>
-	
+
 		<input class="form-control"  type="text" name="surname" placeholder="Surname"> <br> <br>
-	
+
 		<input class="form-control" type="text" name="telephone" placeholder="Phone Number"> <br> <br>
-		 
+
 			<button class="btn btn-primary" type="submit">Submit</button>
 		</form>
-	
+
 	</div>
-	
-	
+
+
 	<div id="verification" style="display: none;">
 		<form action="{% url 'process_queue' %}" method='POST'>
 			{% csrf_token %}
-	
+
 			{% if state == 'failed' %}
 				<h3 style="color:red"> Incorrect Code, Please try again... </h3>
 			{% endif %}
 			 <input class="form-control" type="text" name="verification_code" placeholder="Please Enter The Verification Code"><br><br>
-	
-			 <input type="text" name="driver" hidden value="{{driver}}">
+
+
 			 <button class="btn btn-primary" type="submit">Submit</button>
-		
+
 		</form>
-	
+
 	</div></div>
-	
+
 </div>
 
 
@@ -124,7 +142,7 @@ th, td {
 td {
 	height:270px;
 	width: 200px;
-	
+
 }
 
 table {
@@ -141,29 +159,65 @@ table {
 
  <script type="text/javascript">
  	slots = [null , $("#slot1"), $("#slot2"), $("#slot3"), $("#slot4"), $("#slot5"), $("#slot6"), ];
+
 	 console.log(slots);
 
+
+    function enable() {
+        $.ajax({
+            url : "{% url 'allow_capture' %}",
+            type: "POST",
+            data: {},
+
+            success: function(json) {
+
+            }
+
+        })
+    }
  	setInterval(function () {
- 	
+
     $.ajax({
         url: "{% url 'process_queue' %}",
         type: 'GET',
         data: {'check': true},
- 
+
         success: function (json) {
 
             if (json.result) {
+
+                var detection = json.capture_state;
+                var countdown = 10 - json.capture_countdown;
+
+                console.log(json.capture_state);
+                if (countdown > 0) {
+
+                    $("#enable_button").html("Extend Timer");
+                     $("#detection_state").html("<span style='color:green'> Enabled | " + countdown + "</span>");
+
+
+                }
+                else{
+                    $("#detection_state").html("<span style='color:red'> Disabled </span>");
+                    $("#enable_button").html("Enable");
+                }
+
+
+
+
 				if (json.occupations) {
+				    console.log("occccc");
+
 					var i = 1;
 
-					while (i<=5) 
+					while (i<=6)
 						{
 							if (json.occupations.includes(i) && slots[i].attr('class')=="full")
 							 {
 								 i++;
 								 continue;
 							 }
-							 
+
 							 if (!json.occupations.includes(i) && slots[i].attr('class')=="vacant")
 							 {
 								 i++;
@@ -174,23 +228,30 @@ table {
 							slots[i].html("")
 							slots[i].css("background","transparent");
 
-							if (json.occupations.includes(i)) 
+							if (json.occupations.includes(i))
 								{
 									slots[i].addClass("full");
 									slots[i].html('<img src="/static/car.png" style="width:200px; height: 278px">');
+
 								}
 
 							else {
+
 								slots[i].addClass("vacant");
 								slots[i].html('Available');
-								slots[i].css("background","#0fa");
-							
+								slots[i].css("background",colors[i]);
+
+
 							}
-							
+
 							i++;
 						}
+if(json.occupations.includes(6))
+					    $("#slot6").css("background",'rgb(200,0,86)')
+					else
+					    $("#slot6").css("background",'transparent')
 				}
-                if (json.status) 
+                if (json.status)
                 	console.log(json.status);
                 else console.log("empty");
 
